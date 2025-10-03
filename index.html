@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MessMate</title>
+  <link rel="stylesheet" href="style.css?v=6"/>
+</head>
+<body>
+  <!-- Header -->
+  <header class="app-header">
+    <h1>MessMate</h1>
+    <p class="tagline">Find the best mess near you</p>
+  </header>
+
+
+  <!-- Floating Action Panel -->
+  <div class="action-panel">
+    <button class="btn" onclick="location.href='request-mess.html'">➕ Add Mess</button>
+    <button class="btn" onclick="location.href='owner.html'">📋 Submit Menu</button>
+    <button class="btn-outline" onclick="location.href='admin.html'">⚙️ Admin</button>
+  </div>
+
+
+  <!-- Filters -->
+  <section class="layout controls">
+    <input type="text" placeholder="Search messes, areas or dishes..." id="searchBox"/>
+    <select id="sortSelect">
+      <option value="rating">Sort by Rating</option>
+      <option value="priceLow">Price: Low → High</option>
+      <option value="priceHigh">Price: High → Low</option>
+    </select>
+    <button class="btn-outline" id="themeToggle">Toggle Theme</button>
+    <br><br>
+    <label class="chip"><input type="checkbox" id="filterVeg" checked/> Veg</label>
+    <label class="chip"><input type="checkbox" id="filterNonVeg" checked/> Non-Veg</label>
+    <label class="chip"><input type="checkbox" id="showFavs"/> Show Favorites Only</label>
+    <select id="minRating">
+      <option value="0">Min Rating: Any</option>
+      <option value="4">4+</option>
+      <option value="4.5">4.5+</option>
+    </select>
+  </section>
+
+
+  <!-- Two-column layout -->
+  <main class="two-col">
+    <!-- Mess list -->
+    <section class="mess-col">
+      <h2>Available Messes</h2>
+      <div id="messList" class="mess-list"></div>
+    </section>
+
+
+    <!-- Compact Map -->
+    <aside class="map-panel">
+      <div class="map-header">
+        <strong>Location Map</strong>
+        <div class="map-buttons">
+          <button id="openInMaps" class="btn-outline tiny" disabled>Google Maps</button>
+          <button id="directionsWalk" class="btn-outline tiny" disabled>🚶</button>
+          <button id="directionsDrive" class="btn-outline tiny" disabled>🚗</button>
+        </div>
+      </div>
+      <iframe id="mapFrame" loading="lazy"></iframe>
+      <div class="map-hint">Select a mess card to view on the map</div>
+    </aside>
+  </main>
+
+
+  <footer class="footer">
+    © 2025 MessMate
+  </footer>
+
+
+  <script src="script.js"></script>
+</body>
+</html>
+
+
+

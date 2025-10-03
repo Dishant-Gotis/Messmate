@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Submit Today's Menu</title>
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    .form-card { max-width: 680px; margin: 18px auto; padding: 16px; }
+    .form-card label { display:block; margin:10px 0 6px; color: var(--text); font-weight:600; }
+    .form-card input, .form-card select, .form-card textarea {
+      width:100%; padding:12px 14px; border-radius:12px;
+      background: var(--panel); color: var(--text);
+      border: 1px solid rgba(255,255,255,0.18);
+      outline:none; box-shadow: 0 0 0 0 var(--ring); transition: box-shadow .15s ease;
+    }
+    .form-card input::placeholder { color: var(--muted); }
+    .form-card input:focus, .form-card select:focus, .form-card textarea:focus { box-shadow: 0 0 0 6px var(--ring); }
+    .msg { margin-top:8px; color: var(--muted); }
+    .msg.error { color:#ff6a6a; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<header class="app-header">
+  <h1>Submit Today's Menu</h1>
+  <p class="tagline">Mess owners: submit menu for approval</p>
+</header>
+
+
+<main>
+  <section class="card form-card">
+    <div id="warn" class="msg"></div>
+    <div id="loginBox">
+      <h3>Login</h3>
+      <p>Enter your email to receive a magic link:</p>
+      <input type="email" id="loginEmail" placeholder="owner@email.com"/>
+      <button id="loginBtn" class="btn" type="button">Send Magic Link</button>
+      <p id="loginMsg" class="msg"></p>
+    </div>
+
+
+    <form id="menuForm" style="display:none; margin-top:16px;">
+      <label>Your Mess</label>
+      <select id="messSelect" required></select>
+
+
+      <label>Today's Menu (comma separated)</label>
+      <input type="text" id="menuItems" placeholder="Dal Fry, Rice, Roti" required/>
+
+
+      <label>Notes (optional)</label>
+      <textarea id="menuNotes"></textarea>
+
+
+      <button type="submit" class="btn">Submit Menu</button>
+      <p id="menuMsg" class="msg"></p>
+    </form>
+  </section>
+</main>
+
+
+<footer class="footer">
+  © 2025 MessMate —
+  <a href="index.html">Home</a> · <a href="request-mess.html">Add Your Mess</a> · <a href="admin.html">Admin</a>
+</footer>
+
+
+<script>
+  // 🔑 Replace with your real Supabase values
+  const SUPABASE_URL = "https://nffcmficrtylnmildrzc.supabase.co"; // <-- replace
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mZmNtZmljcnR5bG5taWxkcnpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk0MDM5MTQsImV4cCI6MjA3NDk3OTkxNH0.EGYiE5zvKDUNtbD86GtxlN7EcQjNt84RFdfydN5-oyM";             // <-- replace
+
+
+
+
+  const warn = document.getElementById('warn');
+  if (SUPABASE_URL.includes("YOUR_PROJECT_REF") || SUPABASE_KEY.includes("YOUR_ANON_PUBLIC_KEY")) {
+    warn.innerHTML = "<span class='msg error'>Set SUPABASE_URL and SUPABASE_KEY at top of page.</span>";
+  }
+  if (location.protocol === "file:") {
+    warn.innerHTML = "<span class='msg error'>Open with VS Code Live Server (http://127.0.0.1:5500), not file://</span>";
+  }
+
+
+  const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+
+  const loginBox = document.getElementById("loginBox");
+  const loginBtn = document.getElementById("loginBtn");
+  const loginEmail = document.getElementById("loginEmail");
+  const loginMsg = document.getElementById("loginMsg");
+  const menuForm = document.getElementById("menuForm");
+  const messSelect = document.getElementById("messSelect");
+  const menuItems = document.getElementById("menuItems");
+  const menuNotes = document.getElementById("menuNotes");
+  const menuMsg = document.getElementById("menuMsg");
+
+
+  loginBtn.addEventListener('click', async () => {
+    loginMsg.textContent = "Sending...";
+    const { error } = await client.auth.signInWithOtp({ email: loginEmail.value.trim() });
+    loginMsg.textContent = error ? ("Error: " + error.message) : "Magic link sent! Check your email.";
+  });
+
+
+  async function updateUI(){
+    const { data:{ session } } = await client.auth.getSession();
+    if (session && session.user) {
+      loginBox.style.display = "none";
+      menuForm.style.display = "block";
+      await loadOwnerMesses(session.user.id);
+    } else {
+      loginBox.style.display = "block";
+      menuForm.style.display = "none";
+    }
+  }
+  client.auth.onAuthStateChange(updateUI);
+  updateUI();
+
+
+  async function loadOwnerMesses(userId){
+    menuMsg.textContent = "Loading your messes…";
+    const { data, error } = await client
+      .from("mess_owner")
+      .select("mess_id, mess(name)")
+      .eq("user_id", userId);
+    if (error) { menuMsg.textContent = "Error: " + error.message; return; }
+    if (!data || !data.length) { menuMsg.textContent = "No mess linked to this account yet (wait for admin approval)."; return; }
+    messSelect.innerHTML = data.map(r => `<option value="${r.mess_id}">${r.mess.name}</option>`).join("");
+    menuMsg.textContent = "";
+  }
+
+
+  menuForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const { data:{ user } } = await client.auth.getUser();
+    if (!user) { menuMsg.textContent = "Not logged in."; return; }
+    const itemsArr = menuItems.value.split(",").map(s=>s.trim()).filter(Boolean);
+    menuMsg.textContent = "Submitting…";
+    const { error } = await client.from("menu_submission").insert({
+      date: new Date().toISOString().slice(0,10),
+      mess_id: messSelect.value,
+      items: itemsArr,
+      submitted_by: user.id,
+      notes: menuNotes.value.trim()
+    });
+    menuMsg.textContent = error ? ("Error: " + error.message) : "Submitted! Waiting for admin approval.";
+    if (!error) menuForm.reset();
+  });
+</script>
+</body>
+</html>
+
+
+
