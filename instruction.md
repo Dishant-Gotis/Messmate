@@ -48,12 +48,22 @@ What the config looks like:
 
 —
 
-## Step 3 — Enable Email/Password Authentication
+## Step 3 — Enable Email/Password + Google Authentication
 Path: Left sidebar → Build → Authentication → Sign-in method tab.
 
+Enable Email/Password:
 1) Click: Email/Password
 2) Toggle: Enable
 3) Click: Save
+
+Enable Google:
+1) Back on Sign-in method tab, find “Google”
+2) Click: Google → Toggle: Enable
+3) Project support email: choose your email (required)
+4) Click: Save
+
+Authorized domains (if needed for Google sign-in):
+- Path: Authentication → Settings tab → Authorized domains → Add domain → add: localhost
 
 —
 
