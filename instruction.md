@@ -142,22 +142,99 @@ localStorage.removeItem('messmate_firebase_config');
 
 —
 
-## Step 9 — (Optional) Demo-friendly Firestore Rules
+## Step 9 — Firestore Rules (Production)
 Path: Build → Firestore Database → Rules tab → Edit rules → Publish.
 
-Paste this for demos:
+Use these production rules (we also saved a copy in firestore.rules in your repo):
 ```txt
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'dishantgotisdg9881@gmail.com' && request.auth.token.email_verified == true;
+    }
+    function validateMess(data) {
+      return data.keys().hasAll(['name','type','pricePerMeal','rating','todaysMenu','address','coordinates','phone']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        data.type in ['veg','non-veg','both'] &&
+        data.pricePerMeal is number && data.pricePerMeal >= 0 && data.pricePerMeal <= 10000 &&
+        data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+        data.todaysMenu is list && data.todaysMenu.size() <= 50 &&
+        data.address is string && data.address.size() > 0 && data.address.size() <= 300 &&
+        data.coordinates is map &&
+        data.coordinates.lat is number && data.coordinates.lat >= -90 && data.coordinates.lat <= 90 &&
+        data.coordinates.lng is number && data.coordinates.lng >= -180 && data.coordinates.lng <= 180 &&
+        data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 20;
+    }
+    function validateStudent(data) {
+      return data.keys().hasAll(['id','name','email','phone','status']) &&
+        data.id == request.auth.uid &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        data.email is string && data.email == request.auth.token.email &&
+        data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 20 &&
+        (!('address' in data) || (data.address is string && data.address.size() <= 300)) &&
+        data.status in ['active','inactive'];
+    }
+    function validateStudentUpdate(old, data) {
+      return validateStudent(data) && data.status == old.status;
+    }
+    match /messes/{messId} {
+      allow read: if true; // public read
+      allow create, update, delete: if isAdmin() && validateMess(request.resource.data);
+    }
+    match /students/{studentId} {
+      allow read: if isAdmin() || ( isSignedIn() && request.auth.uid == studentId );
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.id && validateStudent(request.resource.data);
+      allow update: if isAdmin() || ( isSignedIn() && request.auth.uid == studentId && validateStudentUpdate(resource.data, request.resource.data) );
+      allow delete: if isAdmin();
+    }
     match /{document=**} {
-      allow read: if true;                 // Anyone can read
-      allow write: if request.auth != null; // Only signed-in users can write
+      allow read, write: if false; // default deny
     }
   }
 }
 ```
-For production, lock writes to admin only (requires advanced setup like custom claims).
+Notes:
+- Public can read messes. Only admin (email match + email verified) can write messes.
+- Students can read their own profile; admin can read all students.
+- Students can update their own name/phone/address; status can only be changed by admin.
+
+—
+
+## Step 10 — Deploy to Vercel (Static hosting)
+Option A — GitHub import (UI):
+1) Push this folder to a GitHub repo (Messmate)
+2) Go to https://vercel.com → New Project → Import Git Repository
+3) Select your repo
+4) Framework preset: Other
+5) Build command: (leave empty)
+6) Output directory: . (a single dot)
+7) Deploy
+
+Option B — Vercel CLI (PowerShell):
+```
+npm i -g vercel
+vercel --prod
+```
+Answer prompts:
+- Framework: Other
+- Build command: (empty)
+- Output directory: .
+
+Authorize your deployed domain in Firebase Auth:
+- Path: Authentication → Settings → Authorized domains → Add domain → add your Vercel domain, e.g. your-app.vercel.app (and your custom domain if any)
+
+Google Sign-In works on Vercel as long as the domain is authorized. No extra redirect URLs are needed.
+
+—
+
+## Step 11 — Final production checklist
+- Rules published: Firestore Database → Rules → Publish (using the production rules above)
+- Auth providers enabled: Authentication → Sign-in method → Email/Password + Google (with Project support email set)
+- Authorized domains: localhost + your Vercel domain(s)
+- Admin user exists with the exact email: dishantgotisdg9881@gmail.com
+- Optional: Remove hardcoded Firebase config from app.js and rely on the setup popup or environment-specific build (tell me if you want me to switch it back)
 
 —
 

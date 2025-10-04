@@ -2,6 +2,18 @@
 const ADMIN_EMAIL = 'dishantgotisdg9881@gmail.com';
 const ADMIN_PASSWORD = 'iamadmin';
 
+// Hardcoded Firebase config (added per request)
+// If present, this will be used automatically and saved to localStorage so the setup popup is skipped.
+const HARDCODED_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCcYGEbe96qwqDMRVGidNRkjMFrNZspxPA",
+  authDomain: "messmate-535de.firebaseapp.com",
+  projectId: "messmate-535de",
+  storageBucket: "messmate-535de.firebasestorage.app",
+  messagingSenderId: "209701234027",
+  appId: "1:209701234027:web:bbc5fd8ab2a23c2546582e",
+  measurementId: "G-D03H4LGEKR"
+};
+
 // Basic state
 const state = {
   user: null,
@@ -75,6 +87,11 @@ function loadFirebaseConfig() {
     const saved = localStorage.getItem('messmate_firebase_config');
     if (saved) return JSON.parse(saved);
   } catch {}
+  // If hardcoded config is provided, use it and persist it so the setup modal is skipped
+  if (HARDCODED_FIREBASE_CONFIG && HARDCODED_FIREBASE_CONFIG.apiKey) {
+    try { localStorage.setItem('messmate_firebase_config', JSON.stringify(HARDCODED_FIREBASE_CONFIG)); } catch {}
+    return HARDCODED_FIREBASE_CONFIG;
+  }
   return placeholder;
 }
 
@@ -119,6 +136,8 @@ let firebaseApp, auth, db;
   firebaseApp = firebase.initializeApp(config);
   auth = firebase.auth();
   db = firebase.firestore();
+  // Initialize Analytics if available
+  try { if (firebase.analytics) { firebase.analytics(); } } catch (e) { /* ignore */ }
 })();
 
 // Navigation helpers

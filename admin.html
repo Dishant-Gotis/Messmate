@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MessMate Admin</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%23004E89'/%3E%3Ctext x='50' y='60' text-anchor='middle' font-size='44' fill='white'%3EA%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- Navbar -->
+  <header class="navbar">
+    <div class="brand">
+      <div class="brand-logo" style="background: var(--secondary)">A</div>
+      <div>
+        <div style="font-size:18px; font-weight:800;">MessMate Admin</div>
+        <div class="muted" style="margin-top:-4px;">Demo mode (no database)</div>
+      </div>
+    </div>
+    <div class="nav-actions">
+      <a class="btn ghost" href="./index.html">← Back to Home</a>
+    </div>
+  </header>
+
+  <!-- Toasts and Modals -->
+  <div id="toast-container" class="toast-container"></div>
+  <div id="modal-overlay" class="overlay" aria-hidden="true"></div>
+
+  <!-- ADMIN LAYOUT -->
+  <section id="admin-view">
+    <div class="admin-wrap">
+      <aside class="sidebar">
+        <div class="side-title">Admin</div>
+        <div class="side-link active" data-admin-page="dashboard">📊 Dashboard Overview</div>
+        <div class="side-link" data-admin-page="messes">🍽️ Manage Messes</div>
+        <div class="side-link" data-admin-page="students">👥 Student Data</div>
+      </aside>
+      <main class="admin-main">
+        <!-- Dashboard -->
+        <section id="admin-dashboard" class="admin-page">
+          <div class="row" style="justify-content: space-between; align-items: center;">
+            <h2 class="section-title">Dashboard Overview</h2>
+            <div class="row">
+              <button id="btn-seed" class="btn warning">Reset Demo Data</button>
+            </div>
+          </div>
+          <div class="cards">
+            <div class="card stat">
+              <h3>Total Messes</h3>
+              <div class="num" id="stat-messes">0</div>
+            </div>
+            <div class="card stat">
+              <h3>Total Students</h3>
+              <div class="num" id="stat-students">0</div>
+            </div>
+            <div class="card stat">
+              <h3>Average Rating</h3>
+              <div class="num" id="stat-rating">0.0 ⭐</div>
+            </div>
+            <div class="card stat">
+              <h3>Most Popular Mess</h3>
+              <div class="num" id="stat-popular">—</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Manage Messes -->
+        <section id="admin-messes" class="admin-page hidden">
+          <div class="row" style="justify-content: space-between; align-items: center;">
+            <h2 class="section-title">Manage Messes</h2>
+            <div class="row">
+              <input id="messes-search" class="input" placeholder="Search messes..." />
+              <button id="btn-add-mess" class="btn">Add New Mess</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Mess Name</th>
+                  <th>Type</th>
+                  <th>Price (₹)</th>
+                  <th>Rating</th>
+                  <th>Phone</th>
+                  <th style="width: 140px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="messes-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Student Data -->
+        <section id="admin-students" class="admin-page hidden">
+          <div class="row" style="justify-content: space-between; align-items: center;">
+            <h2 class="section-title">Student Data</h2>
+            <div class="row">
+              <input id="students-search" class="input" placeholder="Search name or email..." />
+              <button id="btn-add-student" class="btn">Add New Student</button>
+              <button id="btn-export-students" class="btn ghost">Export CSV</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Student Name</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Registration Date</th>
+                  <th>Status</th>
+                  <th style="width: 140px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="students-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </section>
+
+  <script>
+    // Demo/admin-only page (no Firebase). Uses in-memory data.
+    const state = { messes: [], students: [] };
+
+    // Toasts
+    function showToast(message, type = 'info') {
+      const el = document.createElement('div');
+      el.className = `toast ${type}`;
+      el.textContent = message;
+      document.getElementById('toast-container').appendChild(el);
+      setTimeout(() => el.remove(), 3000);
+    }
+
+    // Modals
+    function openModal({ title = '', body = '', actions = [] }) {
+      const overlay = document.getElementById('modal-overlay');
+      overlay.innerHTML = `
+        <div class="modal" role="dialog" aria-modal="true">
+          <div class="modal-header">
+            <strong>${title}</strong>
+            <button class="btn ghost small" id="modal-close">✖</button>
+          </div>
+          <div class="modal-body">${body}</div>
+          <div class="modal-footer">
+            ${actions.map((a, i) => `<button class="btn ${a.class || ''}" data-i="${i}">${a.label}</button>`).join('')}
+          </div>
+        </div>`;
+      overlay.classList.add('show');
+      overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+      document.getElementById('modal-close').onclick = closeModal;
+      const buttons = overlay.querySelectorAll('.modal-footer .btn');
+      buttons.forEach(btn => btn.addEventListener('click', () => {
+        const i = +btn.getAttribute('data-i');
+        const action = actions[i];
+        if (action && action.onClick) action.onClick();
+      }));
+      document.addEventListener('keydown', escCloseOnce);
+    }
+    function escCloseOnce(e){ if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escCloseOnce);} }
+    function closeModal(){ const overlay = document.getElementById('modal-overlay'); overlay.classList.remove('show'); overlay.innerHTML = ''; }
+    function confirmDialog(message, onYes){
+      openModal({
+        title: 'Please Confirm',
+        body: `<p>${message}</p>`,
+        actions: [
+          { label: 'Cancel', class: 'ghost', onClick: closeModal },
+          { label: 'Yes, Confirm', class: 'error', onClick: () => { closeModal(); onYes && onYes(); } }
+        ]
+      });
+    }
+
+    // Sample data
+    const SAMPLE_MESSES = [
+      { name:'Shivneri Veg Mess', type:'veg', pricePerMeal:100, rating:4.6, todaysMenu:['Dal Tadka','Paneer Butter Masala','Jeera Rice','Phulka'], address:'Kothrud, Pune', coordinates:{lat:18.5074,lng:73.8077}, phone:'+919999000001' },
+      { name:'Spice Route Non-Veg', type:'non-veg', pricePerMeal:180, rating:4.3, todaysMenu:['Chicken Curry','Egg Masala','Jeera Rice','Paratha'], address:'Hadapsar, Pune', coordinates:{lat:18.5089,lng:73.9260}, phone:'+919999000002' },
+      { name:'Balanced Bite', type:'both', pricePerMeal:140, rating:4.5, todaysMenu:['Rajma','Paneer Bhurji','Chicken Curry','Roti'], address:'Viman Nagar, Pune', coordinates:{lat:18.5679,lng:73.9143}, phone:'+919999000003' },
+      { name:'Pune Tiffin Center', type:'veg', pricePerMeal:90, rating:4.0, todaysMenu:['Sambar','Idli','Upma','Dosa'], address:'Shivajinagar, Pune', coordinates:{lat:18.5308,lng:73.8470}, phone:'+919999000004' },
+      { name:'Deccan Delight', type:'both', pricePerMeal:150, rating:4.7, todaysMenu:['Veg Thali','Fish Curry','Rice','Chapati'], address:'Deccan Gymkhana, Pune', coordinates:{lat:18.5167,lng:73.8415}, phone:'+919999000005' },
+      { name:'FC Road Non-Veg House', type:'non-veg', pricePerMeal:170, rating:4.2, todaysMenu:['Mutton Curry','Egg Curry','Rice','Bhakri'], address:'FC Road, Pune', coordinates:{lat:18.5286,lng:73.8446}, phone:'+919999000006' },
+      { name:'Magarpatta Meals', type:'both', pricePerMeal:130, rating:4.4, todaysMenu:['Dal Fry','Chicken Biryani','Salad','Roti'], address:'Magarpatta, Pune', coordinates:{lat:18.5193,lng:73.9312}, phone:'+919999000007' },
+      { name:'Baner Bhukkad', type:'veg', pricePerMeal:110, rating:3.9, todaysMenu:['Chole','Paneer Tikka','Rice','Naan'], address:'Baner, Pune', coordinates:{lat:18.5590,lng:73.7868}, phone:'+919999000008' },
+      { name:'Kalyani Curry Club', type:'both', pricePerMeal:160, rating:4.8, todaysMenu:['Paneer Kadai','Chicken Tikka','Dal Makhani','Roti'], address:'Kalyani Nagar, Pune', coordinates:{lat:18.5516,lng:73.9010}, phone:'+919999000009' },
+      { name:'Wakad Zaika', type:'non-veg', pricePerMeal:150, rating:3.8, todaysMenu:['Chicken Thali','Egg Bhurji','Rice','Chapati'], address:'Wakad, Pune', coordinates:{lat:18.5980,lng:73.7707}, phone:'+919999000010' }
+    ].map((m,i)=>({ id:String(i+1), ...m }));
+
+    const SAMPLE_STUDENTS = [
+      ['Aarav Mehta','aarav.mehta@example.com','+919820000001','active'],
+      ['Isha Kulkarni','isha.kulkarni@example.com','+919820000002','active'],
+      ['Rohan Patil','rohan.patil@example.com','+919820000003','inactive'],
+      ['Priya Sharma','priya.sharma@example.com','+919820000004','active'],
+      ['Karan Gupta','karan.gupta@example.com','+919820000005','active'],
+      ['Sneha Joshi','sneha.joshi@example.com','+919820000006','inactive'],
+      ['Aditya Deshmukh','aditya.deshmukh@example.com','+919820000007','active'],
+      ['Neha Singh','neha.singh@example.com','+919820000008','active'],
+      ['Sahil Khan','sahil.khan@example.com','+919820000009','inactive'],
+      ['Pooja Nair','pooja.nair@example.com','+919820000010','active'],
+      ['Vikas Rao','vikas.rao@example.com','+919820000011','active'],
+      ['Simran Kaur','simran.kaur@example.com','+919820000012','inactive'],
+      ['Rahul Verma','rahul.verma@example.com','+919820000013','active'],
+      ['Ananya Iyer','ananya.iyer@example.com','+919820000014','active'],
+      ['Harsh Jain','harsh.jain@example.com','+919820000015','inactive']
+    ].map(([name,email,phone,status],i)=>({ id:String(i+1), name,email,phone,address:'',status, registeredAt: Date.now() - (i+1)*8640000 }));
+
+    function resetDemoData(){
+      state.messes = JSON.parse(JSON.stringify(SAMPLE_MESSES));
+      state.students = JSON.parse(JSON.stringify(SAMPLE_STUDENTS));
+      renderMessTable(state.messes);
+      renderStudentTable(state.students);
+      renderDashboard();
+      showToast('Demo data reset', 'success');
+    }
+
+    // Helpers
+    function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+    function escapeAttr(s){ return String(s??'').replace(/"/g,'&quot;'); }
+    function badgeHtml(type){
+      const cls = type === 'veg' ? 'veg' : type === 'non-veg' ? 'non-veg' : 'both';
+      return `<span class="badge ${cls}">${type.replace('-', ' ').toUpperCase()}</span>`;
+    }
+
+    // Rendering
+    function calculateStatistics(){
+      const totalMesses = state.messes.length;
+      const totalStudents = state.students.length;
+      const avgRating = totalMesses ? (state.messes.reduce((a,b)=>a+Number(b.rating||0),0)/totalMesses) : 0;
+      const popular = state.messes.slice().sort((a,b)=>Number(b.rating)-Number(a.rating))[0];
+      return { totalMesses, totalStudents, avgRating: avgRating.toFixed(2), popular: popular ? popular.name : '—' };
+    }
+    function renderDashboard(){
+      const s = calculateStatistics();
+      document.getElementById('stat-messes').textContent = s.totalMesses;
+      document.getElementById('stat-students').textContent = s.totalStudents;
+      document.getElementById('stat-rating').textContent = `${s.avgRating} ⭐`;
+      document.getElementById('stat-popular').textContent = s.popular;
+    }
+
+    function renderMessTable(messes){
+      const tbody = document.getElementById('messes-tbody');
+      tbody.innerHTML = '';
+      const q = (document.getElementById('messes-search').value||'').toLowerCase();
+      messes.filter(m => !q || m.name.toLowerCase().includes(q)).forEach(m => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(m.name)}</td>
+          <td>${badgeHtml(m.type)}</td>
+          <td>₹ ${Number(m.pricePerMeal).toFixed(0)}</td>
+          <td>${Number(m.rating).toFixed(1)} ⭐</td>
+          <td>${escapeHtml(m.phone||'')}</td>
+          <td>
+            <div class="table-actions">
+              <button class="btn ghost small" data-edit="${m.id}">✏️ Edit</button>
+              <button class="btn error small" data-delete="${m.id}">🗑️ Delete</button>
+            </div>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+      tbody.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => openMessModal('edit', state.messes.find(x => x.id === btn.dataset.edit))));
+      tbody.querySelectorAll('[data-delete]').forEach(btn => btn.addEventListener('click', () => {
+        const m = state.messes.find(x => x.id === btn.dataset.delete);
+        confirmDialog(`Delete "${m.name}"?`, () => {
+          state.messes = state.messes.filter(x => x.id !== m.id);
+          renderMessTable(state.messes); renderDashboard(); showToast('Mess deleted','success');
+        });
+      }));
+    }
+
+    function renderStudentTable(students){
+      const tbody = document.getElementById('students-tbody');
+      tbody.innerHTML = '';
+      const q = (document.getElementById('students-search').value||'').toLowerCase();
+      students.filter(s => !q || s.name?.toLowerCase().includes(q) || s.email?.toLowerCase().includes(q)).forEach(s => {
+        const d = new Date(s.registeredAt||Date.now()).toLocaleDateString();
+        const badge = s.status === 'active' ? `<span class="badge" style="background:#ECFDF5;color:#065F46;border:1px solid #A7F3D0;">Active</span>` : `<span class="badge" style="background:#FEF2F2;color:#991B1B;border:1px solid #FECACA;">Inactive</span>`;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(s.name||'')}</td>
+          <td>${escapeHtml(s.email||'')}</td>
+          <td>${escapeHtml(s.phone||'')}</td>
+          <td>${d}</td>
+          <td>${badge}</td>
+          <td>
+            <div class="table-actions">
+              <button class="btn ghost small" data-edit="${s.id}">✏️ Edit</button>
+              <button class="btn error small" data-delete="${s.id}">🗑️ Delete</button>
+            </div>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+      tbody.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => openStudentModal('edit', state.students.find(x => x.id === btn.dataset.edit))));
+      tbody.querySelectorAll('[data-delete]').forEach(btn => btn.addEventListener('click', () => {
+        const s = state.students.find(x => x.id === btn.dataset.delete);
+        confirmDialog(`Delete student "${s.name}"?`, () => {
+          state.students = state.students.filter(x => x.id !== s.id);
+          renderStudentTable(state.students); renderDashboard(); showToast('Student deleted','success');
+        });
+      }));
+    }
+
+    // Modals
+    function openMessModal(mode, data){
+      const isEdit = mode === 'edit';
+      const m = data || { id:String(Date.now()), name:'', type:'veg', pricePerMeal:'', rating:'', todaysMenu:'', address:'', coordinates:{lat:'', lng:''}, phone:'' };
+      const body = `
+        <form id="mess-form">
+          <div class="field"><label class="label">Mess Name*</label><input name="name" class="input" value="${escapeAttr(m.name)}" required /></div>
+          <div class="field-inline">
+            <div class="field"><label class="label">Type*</label>
+              <select name="type" class="select" required>
+                <option value="veg" ${m.type==='veg'?'selected':''}>Veg</option>
+                <option value="non-veg" ${m.type==='non-veg'?'selected':''}>Non-Veg</option>
+                <option value="both" ${m.type==='both'?'selected':''}>Both</option>
+              </select>
+            </div>
+            <div class="field"><label class="label">Price per Meal* (₹)</label><input name="pricePerMeal" type="number" min="0" class="input" value="${escapeAttr(m.pricePerMeal)}" required /></div>
+          </div>
+          <div class="field-inline">
+            <div class="field"><label class="label">Rating* (1-5)</label><input name="rating" type="number" min="1" max="5" step="0.1" class="input" value="${escapeAttr(m.rating)}" required /></div>
+            <div class="field"><label class="label">Phone Number* (+91XXXXXXXXXX)</label><input name="phone" class="input" value="${escapeAttr(m.phone)}" required /></div>
+          </div>
+          <div class="field"><label class="label">Today's Menu* (comma-separated)</label><textarea name="todaysMenu" class="textarea" required>${(m.todaysMenu||[]).join(', ')}</textarea></div>
+          <div class="field"><label class="label">Address*</label><textarea name="address" class="textarea" required>${escapeHtml(m.address||'')}</textarea></div>
+          <div class="field-inline">
+            <div class="field"><label class="label">Latitude*</label><input name="lat" type="number" step="any" class="input" value="${escapeAttr(m.coordinates?.lat)}" required /></div>
+            <div class="field"><label class="label">Longitude*</label><input name="lng" type="number" step="any" class="input" value="${escapeAttr(m.coordinates?.lng)}" required /></div>
+          </div>
+        </form>`;
+      openModal({
+        title: isEdit ? 'Edit Mess' : 'Add New Mess',
+        body,
+        actions: [
+          { label: 'Cancel', class: 'ghost', onClick: closeModal },
+          { label: isEdit ? 'Save Changes' : 'Add Mess', class: 'success', onClick: () => {
+              const form = document.getElementById('mess-form');
+              const fd = new FormData(form);
+              const phone = fd.get('phone').trim();
+              if (!/^\+?\d{10,15}$/.test(phone)) { showToast('Invalid phone number', 'error'); return; }
+              const data = {
+                id: m.id,
+                name: fd.get('name').trim(),
+                type: fd.get('type'),
+                pricePerMeal: Number(fd.get('pricePerMeal')),
+                rating: Number(fd.get('rating')),
+                todaysMenu: String(fd.get('todaysMenu')).split(',').map(s => s.trim()).filter(Boolean),
+                address: fd.get('address').trim(),
+                coordinates: { lat: Number(fd.get('lat')), lng: Number(fd.get('lng')) },
+                phone
+              };
+              if (isEdit){
+                const idx = state.messes.findIndex(x => x.id === m.id);
+                state.messes[idx] = data;
+                showToast('Mess updated','success');
+              } else {
+                state.messes.unshift(data);
+                showToast('Mess added','success');
+              }
+              renderMessTable(state.messes); renderDashboard(); closeModal();
+            }
+          }
+        ]
+      });
+    }
+
+    function openStudentModal(mode, data){
+      const isEdit = mode === 'edit';
+      const s = data || { id:String(Date.now()), name:'', email:'', phone:'', address:'', status:'active', registeredAt: Date.now() };
+      const body = `
+        <form id="student-form">
+          <div class="field-inline">
+            <div class="field"><label class="label">Full Name*</label><input name="name" class="input" value="${escapeAttr(s.name)}" required /></div>
+            <div class="field"><label class="label">Email*</label><input name="email" type="email" class="input" value="${escapeAttr(s.email)}" required /></div>
+          </div>
+          <div class="field-inline">
+            <div class="field"><label class="label">Phone Number*</label><input name="phone" class="input" value="${escapeAttr(s.phone)}" required /></div>
+            <div class="field"><label class="label">Status*</label>
+              <select name="status" class="select">
+                <option value="active" ${s.status==='active'?'selected':''}>Active</option>
+                <option value="inactive" ${s.status==='inactive'?'selected':''}>Inactive</option>
+              </select>
+            </div>
+          </div>
+          <div class="field"><label class="label">Address</label><textarea name="address" class="textarea">${escapeHtml(s.address||'')}</textarea></div>
+        </form>`;
+      openModal({
+        title: isEdit ? 'Edit Student' : 'Add New Student',
+        body,
+        actions: [
+          { label: 'Cancel', class: 'ghost', onClick: closeModal },
+          { label: isEdit ? 'Save Changes' : 'Add Student', class: 'success', onClick: () => {
+              const form = document.getElementById('student-form');
+              const fd = new FormData(form);
+              const phone = fd.get('phone').trim();
+              if (!/^\+?\d{10,15}$/.test(phone)) { showToast('Invalid phone number', 'error'); return; }
+              const payload = {
+                id: s.id,
+                name: fd.get('name').trim(),
+                email: fd.get('email').trim(),
+                phone,
+                address: fd.get('address').trim(),
+                status: fd.get('status'),
+                registeredAt: s.registeredAt || Date.now()
+              };
+              if (isEdit){
+                const idx = state.students.findIndex(x => x.id === s.id);
+                state.students[idx] = payload;
+                showToast('Student updated','success');
+              } else {
+                state.students.unshift(payload);
+                showToast('Student added','success');
+              }
+              renderStudentTable(state.students); renderDashboard(); closeModal();
+            }
+          }
+        ]
+      });
+    }
+
+    function exportStudentsCsv(){
+      const rows = [['Name','Email','Phone','Status','RegisteredAt']].concat(state.students.map(s => [s.name||'', s.email||'', s.phone||'', s.status||'', new Date(s.registeredAt||Date.now()).toISOString()]));
+      const csv = rows.map(r => r.map(x => '"' + String(x).replace(/"/g,'""') + '"').join(',')).join('\n');
+      const blob = new Blob([csv], {type: 'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'students.csv'; a.click(); URL.revokeObjectURL(url);
+    }
+
+    function showAdminPage(id){
+      document.querySelectorAll('.admin-page').forEach(p => p.classList.add('hidden'));
+      document.getElementById(`admin-${id}`).classList.remove('hidden');
+      document.querySelectorAll('.side-link').forEach(el => el.classList.remove('active'));
+      const active = Array.from(document.querySelectorAll('.side-link')).find(el => el.dataset.adminPage === id);
+      if (active) active.classList.add('active');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Seed demo
+      resetDemoData();
+
+      // Sidebar nav
+      document.querySelectorAll('.side-link[data-admin-page]').forEach(el => el.addEventListener('click', () => showAdminPage(el.dataset.adminPage)));
+
+      // Search + buttons
+      document.getElementById('messes-search').addEventListener('input', () => renderMessTable(state.messes));
+      document.getElementById('students-search').addEventListener('input', () => renderStudentTable(state.students));
+      document.getElementById('btn-add-mess').addEventListener('click', () => openMessModal('add'));
+      document.getElementById('btn-add-student').addEventListener('click', () => openStudentModal('add'));
+      document.getElementById('btn-export-students').addEventListener('click', exportStudentsCsv);
+      document.getElementById('btn-seed').addEventListener('click', resetDemoData);
+
+      // Initial render
+      renderDashboard();
+      renderMessTable(state.messes);
+      renderStudentTable(state.students);
+    });
+  </script>
+</body>
+</html>

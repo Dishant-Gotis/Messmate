@@ -178,10 +178,12 @@
     .mb-20 { margin-bottom: 20px; }
     .row { display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
   </style>
-  <!-- Firebase SDKs -->
+  <!-- Firebase SDKs (disabled for now)
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics-compat.js"></script>
+  -->
 </head>
 <body>
   <!-- Navbar -->
@@ -409,6 +411,9 @@
     const ADMIN_EMAIL = 'dishantgotisdg9881@gmail.com';
     const ADMIN_PASSWORD = 'iamadmin';
 
+    // Disable Firebase for now (no SDKs, no auth, no DB). The app will run in demo mode.
+    const FIREBASE_DISABLED = true;
+
     // Basic state
     const state = {
       user: null,
@@ -521,6 +526,9 @@
 
     let firebaseApp, auth, db;
     (function initFirebase(){
+      if (typeof FIREBASE_DISABLED !== 'undefined' && FIREBASE_DISABLED) {
+        firebaseApp = null; auth = null; db = null; return;
+      }
       const config = loadFirebaseConfig();
       if (promptFirebaseConfigIfNeeded(config)) return;
       firebaseApp = firebase.initializeApp(config);
@@ -647,6 +655,10 @@
     async function deleteMess(id){ return db.collection('messes').doc(id).delete(); }
 
     async function fetchMessesOnce(){
+      if (typeof FIREBASE_DISABLED !== 'undefined' && FIREBASE_DISABLED) {
+        // Return sample data in demo mode (no Firebase)
+        return SAMPLE_MESSES.map((m, i) => ({ id: String(i+1), ...m }));
+      }
       const snap = await db.collection('messes').get();
       return snap.docs.map(d => ({ id: d.id, ...d.data() }));
     }
@@ -1017,15 +1029,27 @@
 
     // Auth state observer
     function initAuth(){
+      if (!auth) return; // no-op when Firebase disabled
       auth.onAuthStateChanged(async (user) => {
         state.user = user;
         if (!user){
-          state.role = null;
+          // Dev mode: bypass account and verification, go straight to homepage (student view)
+          state.role = 'student';
           updateNavbar();
-          showView('auth');
-          // Unsubscribe listeners
+          // Unsubscribe any existing listeners
           if (state.unsub.messes) { state.unsub.messes(); state.unsub.messes = null; }
           if (state.unsub.students) { state.unsub.students(); state.unsub.students = null; }
+          showView('student');
+          // Load messes and initialize student view
+          document.getElementById('student-loading').classList.remove('hidden');
+          document.getElementById('mess-grid').classList.add('hidden');
+          try {
+            state.messes = await fetchMessesOnce();
+          } catch (e){ showToast(e.message, 'error'); }
+          document.getElementById('student-loading').classList.add('hidden');
+          document.getElementById('mess-grid').classList.remove('hidden');
+          requestUserLocation();
+          applyStudentQuery();
           return;
         }
         state.role = isAdmin(user.email) ? 'admin' : 'student';
@@ -1135,8 +1159,24 @@
       // Dashboard seed
       document.getElementById('btn-seed').addEventListener('click', seedSampleData);
 
-      // Start auth
-      if (auth) initAuth();
+      // Start app (auth if available, otherwise demo mode)
+      if (!FIREBASE_DISABLED && auth) {
+        initAuth();
+      } else {
+        // Directly show student view using sample/local data
+        (async () => {
+          state.role = 'student';
+          updateNavbar();
+          showView('student');
+          document.getElementById('student-loading').classList.remove('hidden');
+          document.getElementById('mess-grid').classList.add('hidden');
+          try { state.messes = await fetchMessesOnce(); } catch (e){ console.warn(e); }
+          document.getElementById('student-loading').classList.add('hidden');
+          document.getElementById('mess-grid').classList.remove('hidden');
+          requestUserLocation();
+          applyStudentQuery();
+        })();
+      }
     });
 
     // Export students CSV
