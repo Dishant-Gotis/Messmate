@@ -4,11 +4,11 @@
 const SUPABASE_CONFIG = {
     // Replace with your actual Supabase project URL
     // Find this in: Supabase Dashboard > Settings > API > Project URL
-    url: 'https://your-project-ref.supabase.co',
+    url: 'https://faetszbcjwfosgexemhz.supabase.co',
     
     // Replace with your actual Supabase anon/public key  
     // Find this in: Supabase Dashboard > Settings > API > Project API keys > anon public
-    anonKey: 'your-anon-key-here',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhZXRzemJjandmb3NnZXhlbWh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1ODA5NjMsImV4cCI6MjA3NTE1Njk2M30.XPdnaw65T_ZclF9otchyRL-s6jRL_P4oy9wJUsloh6I',
     
     // Optional: Configure redirect URLs for different environments
     redirectUrls: {
@@ -36,8 +36,8 @@ let supabase;
 // Function to initialize Supabase (called from login-auth.js)
 const initializeSupabase = () => {
     // Check if configuration is properly set
-    if (SUPABASE_CONFIG.url === 'https://your-project-ref.supabase.co' || 
-        SUPABASE_CONFIG.anonKey === 'your-anon-key-here') {
+    if (SUPABASE_CONFIG.url === 'https://faetszbcjwfosgexemhz.supabase.co' || 
+        SUPABASE_CONFIG.anonKey === 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhZXRzemJjandmb3NnZXhlbWh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1ODA5NjMsImV4cCI6MjA3NTE1Njk2M30.XPdnaw65T_ZclF9otchyRL-s6jRL_P4oy9wJUsloh6I') {
         console.error('⚠️ Supabase configuration not set up properly!');
         console.error('Please update SUPABASE_CONFIG in login-config.js with your actual values.');
         console.error('Follow instruction.md for detailed setup steps.');
