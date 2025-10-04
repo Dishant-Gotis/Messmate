@@ -1,0 +1,52 @@
+{
+  "name": "messmate-auth",
+  "version": "1.0.0",
+  "description": "MessMate authentication system with Supabase integration",
+  "main": "login.html",
+  "scripts": {
+    "dev": "npx serve .",
+    "start": "npx serve . -p 3000",
+    "serve": "npx serve .",
+    "preview": "npx serve . -p 5000"
+  },
+  "keywords": [
+    "authentication",
+    "login",
+    "supabase",
+    "oauth",
+    "phone-auth",
+    "email-auth"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0"
+  },
+  "devDependencies": {
+    "serve": "^14.2.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "your-repo-url-here"
+  },
+  "bugs": {
+    "url": "your-repo-url-here/issues"
+  },
+  "homepage": "your-repo-url-here#readme",
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ],
+  "files": [
+    "login.html",
+    "login-styles.css",
+    "login-auth.js",
+    "login-config.js",
+    "instruction.md",
+    "README.md"
+  ]
+}

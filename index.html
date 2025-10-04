@@ -178,6 +178,10 @@
     .mb-20 { margin-bottom: 20px; }
     .row { display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
   </style>
+  <!-- Supabase SDK -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="login-config.js"></script>
+  
   <!-- Firebase SDKs (disabled for now)
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -566,78 +570,126 @@
       if (active) active.classList.add('active');
     }
 
-    // Auth
+    // Supabase Authentication
+    let supabase;
+    
+    // Initialize Supabase
+    function initSupabase() {
+      try {
+        supabase = initializeSupabase();
+        if (!supabase) {
+          showToast('Supabase configuration error. Please check login-config.js', 'error');
+          return false;
+        }
+        return true;
+      } catch (error) {
+        console.error('Failed to initialize Supabase:', error);
+        showToast('Failed to initialize authentication', 'error');
+        return false;
+      }
+    }
+    
     async function login(email, password){
       try {
-        if (email === ADMIN_EMAIL && password !== ADMIN_PASSWORD) {
-          throw new Error('Admin credentials incorrect.');
-        }
-        await auth.signInWithEmailAndPassword(email, password);
-        showToast('Logged in successfully', 'success');
-      } catch (e){
-        document.getElementById('login-error').textContent = e.message;
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email,
+          password: password
+        });
+        
+        if (error) throw error;
+        
+        showToast('Login successful!', 'success');
+        return data;
+      } catch (error) {
+        console.error('Login error:', error);
+        const errorMsg = getAuthErrorMessage(error);
+        showToast(errorMsg, 'error');
+        document.getElementById('login-error').textContent = errorMsg;
         document.getElementById('login-error').classList.remove('hidden');
+        throw error;
       }
     }
 
     async function register(email, password, userData){
       try {
-        if (email === ADMIN_EMAIL) throw new Error('Admin account cannot be registered here. Use login.');
-        const res = await auth.createUserWithEmailAndPassword(email, password);
-        const uid = res.user.uid;
-        // Create student document
-        await db.collection('students').doc(uid).set({
-          id: uid,
-          name: userData.name,
-          email,
-          phone: userData.phone,
-          address: userData.address || '',
-          status: 'active',
-          registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        const { data, error } = await supabase.auth.signUp({
+          email: email,
+          password: password,
+          options: {
+            data: {
+              full_name: userData.name,
+              phone: userData.phone,
+              address: userData.address
+            }
+          }
         });
-        showToast('Account created. You are logged in.', 'success');
-      } catch (e){
-        document.getElementById('register-error').textContent = e.message;
+        
+        if (error) throw error;
+        
+        if (data.user && !data.session) {
+          showToast('Please check your email and click the confirmation link to activate your account.', 'success');
+        } else {
+          showToast('Registration successful!', 'success');
+        }
+        return data;
+      } catch (error) {
+        console.error('Registration error:', error);
+        const errorMsg = getAuthErrorMessage(error);
+        showToast(errorMsg, 'error');
+        document.getElementById('register-error').textContent = errorMsg;
         document.getElementById('register-error').classList.remove('hidden');
+        throw error;
       }
     }
 
-    function logout(){ auth.signOut(); }
+    async function logout(){ 
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+        showToast('Logged out successfully', 'success');
+      } catch (error) {
+        console.error('Logout error:', error);
+        showToast('Logout failed', 'error');
+      }
+    }
 
-    function isAdmin(email){ return email === ADMIN_EMAIL; }
+    function isAdmin(email){ 
+      const ADMIN_EMAILS = ['admin@messmate.com', 'admin@example.com']; // Add your admin emails here
+      return ADMIN_EMAILS.includes(email?.toLowerCase());
+    }
 
-    // Google Sign-In
+    // Google Sign-In with Supabase
     async function loginWithGoogle(){
       try {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        await auth.signInWithPopup(provider);
-        showToast('Logged in with Google', 'success');
-      } catch (e){
-        showToast(e.message, 'error');
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin
+          }
+        });
+        
+        if (error) throw error;
+        // OAuth will redirect automatically
+      } catch (error) {
+        console.error('Google login error:', error);
+        showToast(getAuthErrorMessage(error), 'error');
       }
+    }
+    
+    // Error message helper
+    function getAuthErrorMessage(error) {
+      const errorMessages = {
+        'Invalid login credentials': 'Invalid email or password. Please try again.',
+        'Email not confirmed': 'Please check your email and click the confirmation link.',
+        'User already registered': 'An account with this email already exists. Please sign in instead.',
+        'Too many requests': 'Too many attempts. Please wait a few minutes before trying again.',
+      };
+      
+      return errorMessages[error.message] || error.message || 'An unexpected error occurred. Please try again.';
     }
 
-    // Ensure a student profile exists for Google sign-ins
-    async function ensureStudentProfile(user){
-      if (!user) return;
-      if (isAdmin(user.email)) return; // admin doesn't need a student doc
-      const ref = db.collection('students').doc(user.uid);
-      const snap = await ref.get();
-      if (!snap.exists){
-        const now = firebase.firestore.FieldValue.serverTimestamp();
-        await ref.set({
-          id: user.uid,
-          name: user.displayName || '',
-          email: user.email || '',
-          phone: '',
-          address: '',
-          status: 'active',
-          registeredAt: now,
-          updatedAt: now
-        });
-      }
-    }
+    // Ensure a student profile exists (no-op)
+    async function ensureStudentProfile(user){ return; }
 
     // Firestore: Messes CRUD
     async function addMess(data){
@@ -664,23 +716,13 @@
     }
 
     // Firestore: Students CRUD
-    async function addStudent(data){
-      const now = firebase.firestore.FieldValue.serverTimestamp();
-      return db.collection('students').add({
-        ...data,
-        registeredAt: now,
-        updatedAt: now
-      });
-    }
-    async function updateStudent(id, data){
-      const now = firebase.firestore.FieldValue.serverTimestamp();
-      return db.collection('students').doc(id).update({ ...data, updatedAt: now });
-    }
-    async function deleteStudent(id){ return db.collection('students').doc(id).delete(); }
+    async function addStudent(data){ return Promise.resolve(); }
+    async function updateStudent(id, data){ return Promise.resolve(); }
+    async function deleteStudent(id){ return Promise.resolve(); }
 
     async function fetchStudentsOnce(){
-      const snap = await db.collection('students').get();
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // No database in this build
+      return [];
     }
 
     // Distance utilities
@@ -1027,53 +1069,43 @@
       }, { enableHighAccuracy: true, timeout: 8000 });
     }
 
-    // Auth state observer
+    // Supabase Auth state observer
     function initAuth(){
-      if (!auth) return; // no-op when Firebase disabled
-      auth.onAuthStateChanged(async (user) => {
+      if (!supabase) return; // no-op when Supabase not initialized
+      
+      // Listen for auth changes
+      supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log('Auth state changed:', event, session);
+        
+        const user = session?.user || null;
         state.user = user;
+        
         if (!user){
-          // Dev mode: bypass account and verification, go straight to homepage (student view)
-          state.role = 'student';
+          // Show auth view (login form) when not authenticated
+          showView('auth');
           updateNavbar();
           // Unsubscribe any existing listeners
           if (state.unsub.messes) { state.unsub.messes(); state.unsub.messes = null; }
           if (state.unsub.students) { state.unsub.students(); state.unsub.students = null; }
-          showView('student');
-          // Load messes and initialize student view
-          document.getElementById('student-loading').classList.remove('hidden');
-          document.getElementById('mess-grid').classList.add('hidden');
-          try {
-            state.messes = await fetchMessesOnce();
-          } catch (e){ showToast(e.message, 'error'); }
-          document.getElementById('student-loading').classList.add('hidden');
-          document.getElementById('mess-grid').classList.remove('hidden');
-          requestUserLocation();
-          applyStudentQuery();
           return;
         }
+        
+        // User is authenticated
         state.role = isAdmin(user.email) ? 'admin' : 'student';
         updateNavbar();
         if (state.role === 'admin'){
           showView('admin');
           showAdminPage('dashboard');
-          // Realtime listeners
-          state.unsub.messes = db.collection('messes').onSnapshot(snap => {
-            state.messes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            renderMessTable(state.messes);
-            renderDashboard();
-          });
-          state.unsub.students = db.collection('students').onSnapshot(snap => {
-            state.students = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            renderStudentTable(state.students);
-            renderDashboard();
-          });
+          // Load static data for admin (since we don't have Firebase)
+          state.messes = SAMPLE_MESSES.map((m, i) => ({ id: String(i+1), ...m }));
+          state.students = SAMPLE_STUDENTS;
+          renderMessTable(state.messes);
+          renderStudentTable(state.students);
+          renderDashboard();
         } else {
-          // Make sure there's a student profile if using Google sign-in
-          try { await ensureStudentProfile(user); } catch (e) { console.warn(e); }
-
+          // Student view
           showView('student');
-          // One-time fetch messes for performance
+          // Load messes for performance
           document.getElementById('student-loading').classList.remove('hidden');
           document.getElementById('mess-grid').classList.add('hidden');
           try {
@@ -1159,23 +1191,30 @@
       // Dashboard seed
       document.getElementById('btn-seed').addEventListener('click', seedSampleData);
 
-      // Start app (auth if available, otherwise demo mode)
-      if (!FIREBASE_DISABLED && auth) {
+      // Initialize Supabase and start authentication
+      if (initSupabase()) {
         initAuth();
-      } else {
-        // Directly show student view using sample/local data
+        
+        // Check for existing session on page load
         (async () => {
-          state.role = 'student';
-          updateNavbar();
-          showView('student');
-          document.getElementById('student-loading').classList.remove('hidden');
-          document.getElementById('mess-grid').classList.add('hidden');
-          try { state.messes = await fetchMessesOnce(); } catch (e){ console.warn(e); }
-          document.getElementById('student-loading').classList.add('hidden');
-          document.getElementById('mess-grid').classList.remove('hidden');
-          requestUserLocation();
-          applyStudentQuery();
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+              console.log('Existing session found:', session);
+              // User is already logged in, the auth state change will handle the redirect
+            } else {
+              // No session, show auth form
+              showView('auth');
+            }
+          } catch (error) {
+            console.error('Session check error:', error);
+            showView('auth');
+          }
         })();
+      } else {
+        // Fallback: show auth form with error
+        showView('auth');
+        showToast('Authentication setup required. Please check configuration.', 'error');
       }
     });
 

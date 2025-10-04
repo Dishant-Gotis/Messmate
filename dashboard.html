@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - MessMate</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%23FF6B35'/%3E%3Ctext x='50' y='60' text-anchor='middle' font-size='44' fill='white'%3EM%3C/text%3E%3C/svg%3E" />
+    <style>
+        :root {
+            --primary: #FF6B35;
+            --secondary: #004E89;
+            --bg-light: #F9FAFB;
+            --text-dark: #1F2937;
+            --text-gray: #6B7280;
+            --border: #E5E7EB;
+            --shadow: 0 10px 20px rgba(0,0,0,0.06);
+            --radius: 12px;
+        }
+
+        * { box-sizing: border-box; }
+        
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-dark);
+            background: var(--bg-light);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        .welcome-card {
+            background: white;
+            border-radius: var(--radius);
+            padding: 40px;
+            box-shadow: var(--shadow);
+            margin-bottom: 30px;
+        }
+
+        .brand-logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: 900;
+            margin: 0 auto 20px;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            color: var(--text-dark);
+        }
+
+        .subtitle {
+            color: var(--text-gray);
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            border-radius: 8px;
+            background: var(--primary);
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            margin: 10px;
+            transition: all 0.2s ease;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        .btn.secondary {
+            background: var(--secondary);
+        }
+
+        .btn.ghost {
+            background: transparent;
+            color: var(--text-dark);
+            border: 2px solid var(--border);
+        }
+
+        .btn.ghost:hover {
+            background: #f3f4f6;
+        }
+
+        .user-info {
+            background: #f0f4ff;
+            border: 1px solid #e0e7ff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .loading {
+            color: var(--text-gray);
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="welcome-card">
+            <div class="brand-logo">M</div>
+            <h1>Welcome to MessMate!</h1>
+            <p class="subtitle">You have successfully logged in</p>
+            
+            <div id="user-info" class="user-info">
+                <div id="loading" class="loading">Loading user information...</div>
+            </div>
+
+            <div class="actions">
+                <a href="index.html" class="btn">Browse Messes</a>
+                <a href="admin.html" class="btn secondary" id="admin-btn" style="display: none;">Admin Dashboard</a>
+                <button id="logout-btn" class="btn ghost">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="login-config.js"></script>
+    <script>
+        let supabase;
+
+        async function initializeDashboard() {
+            // Initialize Supabase
+            try {
+                supabase = initializeSupabase();
+                if (!supabase) {
+                    throw new Error('Failed to initialize Supabase');
+                }
+            } catch (error) {
+                console.error('Supabase initialization error:', error);
+                showError('Configuration error. Please check setup.');
+                return;
+            }
+
+            // Check authentication
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                
+                if (error) throw error;
+
+                if (!session) {
+                    // Not authenticated, redirect to main page
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                // Display user information
+                displayUserInfo(session.user);
+
+                // Setup logout handler
+                document.getElementById('logout-btn').addEventListener('click', async () => {
+                    try {
+                        const { error } = await supabase.auth.signOut();
+                        if (error) throw error;
+                        
+                        // Redirect to main page after logout
+                        window.location.href = 'index.html';
+                    } catch (error) {
+                        console.error('Logout error:', error);
+                        alert('Logout failed. Please try again.');
+                    }
+                });
+
+                // Check if user is admin
+                const adminEmails = ['admin@messmate.com', 'admin@example.com'];
+                if (adminEmails.includes(session.user.email?.toLowerCase())) {
+                    document.getElementById('admin-btn').style.display = 'inline-block';
+                }
+
+            } catch (error) {
+                console.error('Session error:', error);
+                showError('Authentication error. Redirecting...');
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+            }
+        }
+
+        function displayUserInfo(user) {
+            const userInfoEl = document.getElementById('user-info');
+            const userMetadata = user.user_metadata || {};
+            
+            userInfoEl.innerHTML = `
+                <h3 style="margin: 0 0 10px 0; color: var(--text-dark);">User Information</h3>
+                <p><strong>Email:</strong> ${user.email}</p>
+                ${userMetadata.full_name ? `<p><strong>Name:</strong> ${userMetadata.full_name}</p>` : ''}
+                ${userMetadata.phone ? `<p><strong>Phone:</strong> ${userMetadata.phone}</p>` : ''}
+                <p><strong>Account Created:</strong> ${new Date(user.created_at).toLocaleDateString()}</p>
+                <p><strong>Last Sign In:</strong> ${new Date(user.last_sign_in_at).toLocaleString()}</p>
+            `;
+        }
+
+        function showError(message) {
+            document.getElementById('user-info').innerHTML = `
+                <div style="color: #ef4444; font-weight: 600;">
+                    ❌ ${message}
+                </div>
+            `;
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', initializeDashboard);
+    </script>
+</body>
+</html>
