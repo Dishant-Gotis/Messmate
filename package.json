@@ -1,0 +1,38 @@
+{
+  "name": "messmate",
+  "version": "1.0.0",
+  "description": "Professional mess management platform with modern design and Supabase authentication",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Static site - no build required'",
+    "deploy": "vercel --prod",
+    "preview": "vercel"
+  },
+  "keywords": [
+    "mess",
+    "food",
+    "restaurant",
+    "management",
+    "pune",
+    "supabase",
+    "authentication",
+    "vercel"
+  ],
+  "author": "MessMate Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Dishant-Gotis/messmate"
+  },
+  "homepage": "https://messmate-ten.vercel.app",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "vercel": "^32.0.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0"
+  }
+}

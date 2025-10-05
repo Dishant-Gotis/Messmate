@@ -4,7 +4,9 @@
 const state = {
   messes: [],
   userLocation: null,
-  loading: false
+  loading: false,
+  user: null,
+  isAuthenticated: false
 };
 
 // Sample Data
@@ -366,6 +368,23 @@ function initializeEventListeners() {
   sortSelect.addEventListener('change', applyFiltersAndSort);
 }
 
+// Authentication State Management
+function updateAuthState(user, isAuthenticated) {
+  state.user = user;
+  state.isAuthenticated = isAuthenticated;
+  
+  // Update UI based on auth state
+  updateAuthUI();
+}
+
+function updateAuthUI() {
+  // This will be handled by authentication.js
+  // We're just keeping the state in sync here
+  if (typeof window.updateAuthUI === 'function') {
+    window.updateAuthUI();
+  }
+}
+
 // Application Initialization
 function initializeApp() {
   console.log('🚀 MessMate Application Starting...');
@@ -378,6 +397,13 @@ function initializeApp() {
   
   // Request user location
   requestUserLocation();
+  
+  // Check authentication status if auth system is available
+  if (typeof window.checkAuthStatus === 'function') {
+    window.checkAuthStatus().then(() => {
+      console.log('🔐 Authentication status checked');
+    });
+  }
   
   console.log('✅ MessMate Application Initialized');
 }
