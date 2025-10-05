@@ -358,9 +358,16 @@ async function handleLoginForm(event) {
   // Sign in with email
   const success = await signInWithEmail(email, password);
   if (success) {
-    // Redirect after successful login
+    // Handle redirect after successful login
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectTo = urlParams.get('redirect');
+    
     setTimeout(() => {
-      window.location.href = 'index.html';
+      if (redirectTo === 'admin') {
+        window.location.href = 'admin.html';
+      } else {
+        window.location.href = 'index.html';
+      }
     }, 1000);
   }
 }
@@ -497,6 +504,8 @@ function showUserMenu() {
 
 // Check Authentication Status
 async function checkAuthStatus() {
+  console.log('🔍 Checking authentication status...');
+  
   if (!supabase) {
     // Demo mode - check localStorage for demo user
     const demoUser = localStorage.getItem('messmate_demo_user');
@@ -504,29 +513,52 @@ async function checkAuthStatus() {
       currentUser = JSON.parse(demoUser);
       authState.isAuthenticated = true;
       authState.user = currentUser;
+      console.log('🎭 Demo user authenticated:', currentUser.email);
+    } else {
+      console.log('🔒 No demo user found');
+      authState.isAuthenticated = false;
     }
     updateAuthUI();
-    return;
+    return authState.isAuthenticated;
   }
   
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
     
     if (error) {
-      console.error('Error checking auth status:', error);
-      return;
+      console.error('❌ Error checking auth status:', error);
+      authState.isAuthenticated = false;
+      return false;
     }
     
     if (session?.user) {
+      console.log('✅ Supabase user authenticated:', session.user.email);
       currentUser = session.user;
       authState.isAuthenticated = true;
       authState.user = session.user;
+    } else {
+      console.log('🔒 No active Supabase session');
+      authState.isAuthenticated = false;
     }
     
     updateAuthUI();
+    return authState.isAuthenticated;
   } catch (error) {
-    console.error('Unexpected error checking auth status:', error);
+    console.error('❌ Unexpected error checking auth status:', error);
+    authState.isAuthenticated = false;
+    return false;
   }
+}
+
+// Global function to check if user is authenticated (used by protected pages)
+function isUserAuthenticated() {
+  // Check both demo mode and Supabase authentication
+  const demoUser = localStorage.getItem('messmate_demo_user');
+  const hasSupabaseSession = currentUser !== null;
+  
+  const isAuth = !!(demoUser || hasSupabaseSession);
+  console.log('🔍 isUserAuthenticated:', isAuth);
+  return isAuth;
 }
 
 // Demo Mode Functions (for when Supabase is not configured)
@@ -565,6 +597,19 @@ function enableDemoMode() {
       
       showToast('Demo login successful! Welcome to MessMate.', 'success');
       setLoadingState(false);
+      
+      // Handle redirect for demo mode
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectTo = urlParams.get('redirect');
+      
+      setTimeout(() => {
+        if (redirectTo === 'admin') {
+          window.location.href = 'admin.html';
+        } else {
+          window.location.href = 'index.html';
+        }
+      }, 1000);
+      
       return true;
     } else {
       setLoadingState(false);
@@ -642,6 +687,7 @@ window.signOut = signOut;
 window.resetPassword = resetPassword;
 window.showUserMenu = showUserMenu;
 window.checkAuthStatus = checkAuthStatus;
+window.isUserAuthenticated = isUserAuthenticated;
 
 // Initialize when DOM is loaded
 if (document.readyState === 'loading') {

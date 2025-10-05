@@ -120,6 +120,28 @@
     </div>
   </section>
 
+  <!-- Authentication Protection -->
+  <script>
+    // Check if user is authenticated before loading admin page
+    function checkAdminAuth() {
+      const isAuthenticated = localStorage.getItem('messmate_demo_user') || 
+                            sessionStorage.getItem('supabase.auth.token');
+      
+      if (!isAuthenticated) {
+        console.log('🔒 Admin access denied, redirecting to login...');
+        window.location.replace('login.html?redirect=admin');
+        return false;
+      }
+      return true;
+    }
+    
+    // Hide content initially and check auth
+    document.body.style.visibility = 'hidden';
+    if (checkAdminAuth()) {
+      document.body.style.visibility = 'visible';
+    }
+  </script>
+  
   <script>
     // Demo/admin-only page (no Firebase). Uses in-memory data.
     const state = { messes: [], students: [] };

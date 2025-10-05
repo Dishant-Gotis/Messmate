@@ -59,14 +59,21 @@ vercel ls
 - **`styles.css`**: Professional design system with CSS custom properties
 
 ### Authentication Flow
-The app uses a dual-mode authentication system:
+The app uses an **authentication-first architecture** with a dual-mode authentication system:
+
+**Flow**: `messmate-ten.vercel.app` → Login Required → Home Page
+
 1. **Production Mode**: Full Supabase integration with email/password and Google OAuth
-2. **Demo Mode**: Hardcoded credentials when Supabase isn't configured
+2. **Demo Mode**: Hardcoded credentials when Supabase isn't configured (`demo@messmate.com` / `demo123`)
+
+**Protected Pages**: Both `index.html` (home) and `admin.html` require authentication
+**Public Pages**: `login.html`, `signup.html`, `forgot-password.html`
 
 Key authentication functions:
 - `initializeSupabase()`: Checks for valid Supabase credentials
-- `signInWithEmail()`: Handles email/password authentication
-- `signInWithGoogle()`: Google OAuth integration
+- `signInWithEmail()`: Handles email/password authentication with redirect support
+- `checkAuthStatus()`: Validates current authentication state
+- `isUserAuthenticated()`: Global auth check for protected pages
 - `updateAuthUI()`: Dynamically updates navbar based on auth state
 
 ### State Management
@@ -217,13 +224,20 @@ Configured in `vercel.json` with production-grade security:
 
 ### Common Issues
 
+#### **Authentication-First Architecture**
+**Expected Flow**: 
+- Visit `messmate-ten.vercel.app` → Automatically redirects to login if not authenticated
+- After successful login → Redirects to home page (`index.html`)
+- Navbar shows user name instead of login buttons
+
 #### **Sign In Page Reloading / Not Redirecting**
 If the login form submits but stays on the same page:
-1. Open browser console (F12) and look for errors
-2. Use `test-auth.html` to debug the authentication flow step-by-step
-3. Check if Supabase initialization is successful
-4. Verify your Supabase project is active and email auth is enabled
-5. Check that site URL in Supabase matches your domain
+1. Open browser console (F12) and look for authentication logs
+2. Look for "🔐 Attempting sign in" and "✅ User authenticated successfully" messages
+3. Use `test-auth.html` to debug the authentication flow step-by-step
+4. Check if Supabase initialization is successful
+5. Verify your Supabase project is active and email auth is enabled
+6. For demo mode: use `demo@messmate.com` / `demo123`
 
 #### **Other Issues**
 1. **Authentication not working**: Check if Supabase URL/keys are set in Vercel environment variables

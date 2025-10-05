@@ -81,6 +81,52 @@
   <!-- Supabase Auth Script -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="authentication.js"></script>
+  
+  <!-- Authentication Guard -->
+  <script>
+    // Protected page - redirect to login if not authenticated
+    async function initializeProtectedPage() {
+      console.log('🔍 Initializing protected page...');
+      
+      // Wait for authentication to initialize
+      await new Promise(resolve => {
+        if (window.checkAuthStatus) {
+          resolve();
+        } else {
+          const checkInterval = setInterval(() => {
+            if (window.checkAuthStatus) {
+              clearInterval(checkInterval);
+              resolve();
+            }
+          }, 100);
+        }
+      });
+      
+      // Check authentication status
+      const isAuthenticated = await window.checkAuthStatus();
+      
+      if (!isAuthenticated) {
+        console.log('🔒 User not authenticated, redirecting to login...');
+        window.location.replace('login.html');
+        return;
+      }
+      
+      console.log('✅ User authenticated, showing page content');
+      // Show page content
+      document.body.style.visibility = 'visible';
+    }
+    
+    // Hide page content initially
+    document.body.style.visibility = 'hidden';
+    
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeProtectedPage);
+    } else {
+      initializeProtectedPage();
+    }
+  </script>
+  
   <script src="main.js"></script>
 </body>
 </html>
